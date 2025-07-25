@@ -2,7 +2,7 @@
   "name": "apraamcos",
   "private": true,
   "scripts": {
-    "start:backend": "pnpm --filter backend start",
+    "dev:backend": "pnpm --filter backend dev",
     "start:frontend": "pnpm --filter frontend start"
   },
   "packageManager": "pnpm@10.11.1",
