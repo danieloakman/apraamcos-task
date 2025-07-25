@@ -1,24 +1,16 @@
 import jwt, { type SignOptions } from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
+import { Result } from "@apraamcos/shared";
+
+const JWT_SECRET =
+  process.env.JWT_SECRET || "development-secret-key-change-in-production";
 
 export type AuthLevel = "basic" | "sensitive";
 
-const JWT_SECRETS: Record<
-  AuthLevel,
-  { secret: string; expiresIn: SignOptions["expiresIn"] }
-> = {
-  basic: {
-    secret:
-      process.env.JWT_SECRET || "development-secret-key-change-in-production",
-    expiresIn: "24h",
-  },
-  sensitive: {
-    secret:
-      process.env.JWT_SECRET_SENSITIVE ||
-      "development-secret-key-change-in-production-sensitive",
-    expiresIn: "15m",
-  },
-};
+export interface TokenPayload {
+  userId: number;
+  authLevel: AuthLevel;
+}
 
 export interface AuthRequest extends Request {
   userId?: number;
@@ -31,31 +23,47 @@ export function authenticateToken(
   next: NextFunction
 ) {
   const authHeader = req.headers["authorization"];
-  const authLevel =
-    (req.headers["x-auth-level"] as AuthLevel | undefined) ?? "basic";
   const token = authHeader && authHeader.split(" ")[1];
 
   if (!token) {
     return res.status(401).json({ error: "Access token required" });
   }
 
-  try {
-    const decoded = jwt.verify(token, JWT_SECRETS[authLevel].secret) as {
-      userId: number;
-    };
-    req.userId = decoded.userId;
-    req.authLevel = authLevel;
-    next();
-  } catch {
+  const { value: decoded, error } = verifyToken(token);
+  if (error) {
+    console.error("Invalid or expired token", error);
     return res.status(403).json({ error: "Invalid or expired token" });
+  }
+
+  req.userId = decoded.userId;
+  req.authLevel = decoded.authLevel;
+  next();
+}
+
+export function requireSensitiveAccess(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) {
+  if (req.authLevel !== "sensitive") {
+    return res.status(403).json({ error: "Sensitive data access required" });
+  }
+  next();
+}
+
+export function verifyToken(token: string): Result<TokenPayload> {
+  try {
+    return { ok: true, value: jwt.verify(token, JWT_SECRET) as TokenPayload };
+  } catch (error) {
+    return { ok: false, error: error as Error };
   }
 }
 
 export function generateToken(
   userId: number,
-  authLevel: AuthLevel = "basic"
+  { authLevel = "basic" }: { authLevel?: AuthLevel } = {}
 ): string {
-  return jwt.sign({ userId }, JWT_SECRETS[authLevel].secret, {
-    expiresIn: JWT_SECRETS[authLevel].expiresIn,
+  return jwt.sign({ userId, authLevel }, JWT_SECRET, {
+    expiresIn: authLevel === "basic" ? "24h" : "15m",
   });
 }
