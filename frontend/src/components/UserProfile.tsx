@@ -4,6 +4,7 @@ import AddressSection from "./AddressSection";
 import ContactSection from "./ContactSection";
 import BankingSection from "./BankingSection";
 import SocialLinksSection from "./SocialLinksSection";
+import SensitiveInfo from "./SensitiveInformation";
 
 const UserProfile: React.FC = () => {
   const {
@@ -258,9 +259,13 @@ const UserProfile: React.FC = () => {
         )}
       </div>
 
-      <ContactSection user={user} onSave={handleSectionSave} />
+      <SensitiveInfo>
+        <ContactSection user={user} onSave={handleSectionSave} />
+      </SensitiveInfo>
       <AddressSection user={user} onSave={handleSectionSave} />
-      <BankingSection user={user} onSave={handleSectionSave} />
+      <SensitiveInfo>
+        <BankingSection user={user} onSave={handleSectionSave} />
+      </SensitiveInfo>
       <SocialLinksSection user={user} onSave={handleSectionSave} />
     </div>
   );

@@ -158,7 +158,6 @@ export const useRequestSensitiveCode = () => {
         method: "POST",
         headers: getAuthHeaders(),
       });
-      console.log(res);
       if (!res.ok) {
         throw new Error(
           `Failed to request code: ${res.status} ${res.statusText}`
@@ -179,7 +178,7 @@ export const useVerifySensitiveCode = (code?: string) => {
         body: JSON.stringify({ code }),
       });
       if (!response.ok) {
-        throw new Error("Failed to verify code");
+        throw new Error(JSON.stringify(await response.json()));
       }
       const data = await response.json();
       useAuthStore.getState().setSensitiveAuthToken(data.token);
