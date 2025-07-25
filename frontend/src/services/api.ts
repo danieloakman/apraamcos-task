@@ -5,7 +5,8 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { create } from "zustand";
+import { useAuthStore } from "./authStore";
+import { useShallow } from "zustand/react/shallow";
 
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "http://localhost:3001/api";
@@ -28,15 +29,8 @@ const includesQueryKeys =
   (q: Query) =>
     keys.some(k => q.queryKey.includes(k));
 
-/** Purposely not stored in local storage. */
-let sensitiveAuthToken: string | null = null;
-function getAuthToken(): string | null {
-  if (sensitiveAuthToken) return sensitiveAuthToken;
-  return localStorage.getItem("auth_token");
-}
-
 function getAuthHeaders() {
-  const token = getAuthToken();
+  const token = useAuthStore.getState().getAuthToken();
   const headers: any = {
     "Content-Type": "application/json",
   };
@@ -56,21 +50,21 @@ async function fetchWithAuth(
     ...options,
     headers: { ...getAuthHeaders(), ...headers },
   });
-  debugger;
   if (response.status === 401) {
-    if (sensitiveAuthToken) {
+    const authStore = useAuthStore.getState();
+    if (authStore.sensitiveAuthToken) {
       // Try again without the sensitive auth token:
-      sensitiveAuthToken = null;
+      authStore.setSensitiveAuthToken(null);
       return fetchWithAuth(url, options);
     } else {
-      localStorage.removeItem("auth_token");
-      sensitiveAuthToken = null;
+      authStore.clearAllTokens();
     }
   }
   return response;
 }
 
-export const isAuthenticated = () => getAuthToken() !== null;
+export const useHasAuth = () =>
+  useAuthStore(useShallow(s => s.isAuthenticated()));
 
 export function useLogin() {
   const queryClient = useQueryClient();
@@ -91,7 +85,7 @@ export function useLogin() {
       }
 
       const data = await response.json();
-      localStorage.setItem("auth_token", data.token);
+      useAuthStore.getState().setAuthToken(data.token);
       return data;
     },
     onSuccess: () => {
@@ -108,8 +102,7 @@ export function useLogout() {
   return useMutation({
     mutationKey: createQueryKey("logout"),
     mutationFn: async () => {
-      localStorage.removeItem("auth_token");
-      sensitiveAuthToken = null;
+      useAuthStore.getState().clearAllTokens();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -120,6 +113,7 @@ export function useLogout() {
 }
 
 export function useCurrentUser() {
+  const hasAuth = useHasAuth();
   return useQuery({
     queryKey: createQueryKey("current-user"),
     queryFn: async () => {
@@ -129,7 +123,7 @@ export function useCurrentUser() {
       }
       return response.json();
     },
-    enabled: isAuthenticated(),
+    enabled: hasAuth,
   });
 }
 
@@ -188,7 +182,7 @@ export const useVerifySensitiveCode = (code?: string) => {
         throw new Error("Failed to verify code");
       }
       const data = await response.json();
-      sensitiveAuthToken = data.token;
+      useAuthStore.getState().setSensitiveAuthToken(data.token);
       queryClient.invalidateQueries({
         predicate: includesQueryKeys("current-user"),
       });

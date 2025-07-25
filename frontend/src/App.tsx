@@ -1,18 +1,19 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import UserProfile from "./components/UserProfile";
 import Login from "./components/Login";
-import { useLogout, useCurrentUser, isAuthenticated } from "./services/api";
+import { useLogout, useCurrentUser, useHasAuth } from "./services/api";
 import "./styles/App.css";
 
 const App: React.FC = () => {
   const currentUser = useCurrentUser();
   const logout = useLogout();
+  const hasAuth = useHasAuth();
 
   if (currentUser.isLoading) {
     return <div className="loading">Loading...</div>;
   }
 
-  if (!isAuthenticated) {
+  if (!hasAuth) {
     return <Login onLogin={() => {}} />;
   }
 
