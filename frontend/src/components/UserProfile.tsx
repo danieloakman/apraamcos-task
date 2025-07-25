@@ -39,7 +39,7 @@ const UserProfile: React.FC = () => {
   }, [user]);
 
   const handleSectionSave = async (sectionData: any) => {
-    if (!user.data) {
+    if (!user) {
       return;
     }
 
@@ -61,15 +61,13 @@ const UserProfile: React.FC = () => {
         ...sectionData,
       };
 
-      const updatedUser = await updateCurrentUser.mutateAsync(updateData);
-      // setUser(updatedUser);
+      await updateCurrentUser.mutateAsync(updateData);
       setSuccess("Section updated successfully!");
-      // setError(null);
 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
-    } catch {
-      // setError("Failed to update section");
+    } catch (error) {
+      console.error("Failed to update section:", error);
     }
   };
 
@@ -87,8 +85,8 @@ const UserProfile: React.FC = () => {
         date_of_birth: dateOfBirth,
       });
       setIsEditingPersonal(false);
-    } catch {
-      // Error handling is done in parent component
+    } catch (error) {
+      console.error("Failed to save personal information:", error);
     } finally {
       setSavingPersonal(false);
     }
@@ -157,7 +155,15 @@ const UserProfile: React.FC = () => {
 
   return (
     <div className="user-profile">
-      {userError && <div className="error">{userError.message}</div>}
+      {userError && (
+        <div className="error">Error loading user: {userError.message}</div>
+      )}
+      {updateCurrentUser.isError && (
+        <div className="error">
+          Error updating user:{" "}
+          {updateCurrentUser.error?.message || "Unknown error"}
+        </div>
+      )}
       {success && <div className="success">{success}</div>}
 
       <div className="section">
