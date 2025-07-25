@@ -60,7 +60,7 @@ router.post("/login", async (req: Request, res: Response) => {
 const tokens = new Map<number, string>();
 
 router.post(
-  "/sensitive/request-code",
+  "/sensitive/request",
   authenticateToken,
   async (req: AuthRequest, res: Response) => {
     try {
@@ -83,7 +83,7 @@ router.post(
 );
 
 router.post(
-  "/sensitive/verify-code",
+  "/sensitive/verify",
   authenticateToken,
   async (req: AuthRequest, res: Response) => {
     try {
