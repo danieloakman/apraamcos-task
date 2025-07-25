@@ -22,6 +22,7 @@ const JWT_SECRETS: Record<
 
 export interface AuthRequest extends Request {
   userId?: number;
+  authLevel?: AuthLevel;
 }
 
 export function authenticateToken(
@@ -43,6 +44,7 @@ export function authenticateToken(
       userId: number;
     };
     req.userId = decoded.userId;
+    req.authLevel = authLevel;
     next();
   } catch {
     return res.status(403).json({ error: "Invalid or expired token" });
