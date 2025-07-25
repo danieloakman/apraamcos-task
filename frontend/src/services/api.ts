@@ -72,7 +72,7 @@ export const apiService = {
   },
 };
 
-export const useRequestCode = () => {
+export const useRequestSensitiveCode = () => {
   return useMutation({
     mutationKey: ["request-code"],
     mutationFn: async () => {
@@ -90,7 +90,7 @@ export const useRequestCode = () => {
   });
 };
 
-export const useVerifyCode = (code?: string) => {
+export const useVerifySensitiveCode = (code?: string) => {
   return useQuery({
     queryKey: ["verify-code", code],
     queryFn: async () => {

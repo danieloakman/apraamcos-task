@@ -6,7 +6,7 @@ import "./styles/App.css";
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading,   setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -44,16 +44,13 @@ const App: React.FC = () => {
 
   return (
     <div className="container">
-        <header className="header">
+      <header className="header">
         <h1>My Account</h1>
         <p>Manage your account information and preferences</p>
-        <button
-          className="btn btn-secondary logout-btn"
-          onClick={handleLogout}
-        >
+        <button className="btn btn-secondary logout-btn" onClick={handleLogout}>
           Logout
         </button>
-        </header>
+      </header>
       <UserProfile />
     </div>
   );
