@@ -14,6 +14,9 @@ importers:
 
   backend:
     dependencies:
+      '@apraamcos/shared':
+        specifier: workspace:*
+        version: link:../shared
       bcryptjs:
         specifier: ^3.0.2
         version: 3.0.2
@@ -145,6 +148,12 @@ importers:
       webpack-dev-server:
         specifier: ^5.2.2
         version: 5.2.2(webpack-cli@6.0.1)(webpack@5.100.2)
+
+  shared:
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
 
 packages:
 
