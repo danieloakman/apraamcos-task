@@ -58,7 +58,7 @@ router.post("/login", async (req: Request, res: Response) => {
 
 /** Since there's only a 15min expiry on the sensitive auth token, we can just store the code in memory */
 const tokens = new Map<
-  number,
+  string,
   {
     token: string;
     /** When the code expires in order to access the token. This isn't the token expiry. */
@@ -76,7 +76,7 @@ router.post(
         res.status(400).json({ error: "Already authenticated" });
       else {
         const token = generateToken(userId, { authLevel: "sensitive" });
-        const code = Math.floor(100000 + Math.random() * 900000);
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
         tokens.set(code, { token, expiresAt: Date.now() + 5 * 60 * 1000 });
         console.log(`*** ${code} *** `);
         res.status(204).send();
