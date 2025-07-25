@@ -1,0 +1,13 @@
+{
+  "name": "apraamcos",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start:backend": "pnpm --filter backend start",
+    "start:frontend": "pnpm --filter frontend start"
+  },
+  "packageManager": "pnpm@10.11.1",
+  "devDependencies": {
+    "mprocs": "^0.7.3"
+  }
+}
