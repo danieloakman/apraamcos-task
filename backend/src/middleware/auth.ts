@@ -1,10 +1,7 @@
 import jwt, { type SignOptions } from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 
-enum AuthLevel {
-  Basic = "basic",
-  Sensitive = "sensitive",
-}
+export type AuthLevel = "basic" | "sensitive";
 
 const JWT_SECRETS: Record<
   AuthLevel,
@@ -34,7 +31,7 @@ export function authenticateToken(
 ) {
   const authHeader = req.headers["authorization"];
   const authLevel =
-    (req.headers["x-auth-level"] as AuthLevel | undefined) ?? AuthLevel.Basic;
+    (req.headers["x-auth-level"] as AuthLevel | undefined) ?? "basic";
   const token = authHeader && authHeader.split(" ")[1];
 
   if (!token) {
@@ -54,7 +51,7 @@ export function authenticateToken(
 
 export function generateToken(
   userId: number,
-  authLevel: AuthLevel = AuthLevel.Basic
+  authLevel: AuthLevel = "basic"
 ): string {
   return jwt.sign({ userId }, JWT_SECRETS[authLevel].secret, {
     expiresIn: JWT_SECRETS[authLevel].expiresIn,
