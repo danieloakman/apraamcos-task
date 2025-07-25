@@ -1,7 +1,12 @@
 import express, { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { getUserByEmail } from "../database";
-import { generateToken } from "../middleware/auth";
+import {
+  authenticateToken,
+  AuthRequest,
+  generateToken,
+  verifyToken,
+} from "../middleware/auth";
 
 const router = express.Router();
 
@@ -50,5 +55,75 @@ router.post("/login", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+/** Since there's only a 15min expiry on the sensitive auth token, we can just store the code in memory */
+const tokens = new Map<
+  string,
+  {
+    token: string;
+    /** When the code expires in order to access the token. This isn't the token expiry. */
+    expiresAt: number;
+  }
+>();
+
+router.post(
+  "/sensitive/request",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
+      if (req.authLevel === "sensitive")
+        res.status(400).json({ error: "Already authenticated" });
+      else {
+        const token = generateToken(userId, { authLevel: "sensitive" });
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        tokens.set(code, { token, expiresAt: Date.now() + 5 * 60 * 1000 });
+        console.log(`*** ${code} *** `);
+        res.status(204).send();
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("/request-code error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+router.post(
+  "/sensitive/verify",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (req.authLevel === "sensitive")
+        res.status(400).json({ error: "Already authenticated" });
+      else {
+        const { code } = req.body;
+        const entry = tokens.get(code);
+        if (!entry) return res.status(400).json({ error: "Invalid code" });
+        if (Date.now() > entry.expiresAt)
+          return res.status(400).json({ error: "Code expired" });
+        const { token } = entry;
+        const { value: decoded, error } = verifyToken(token);
+        if (error) {
+          console.error("Invalid or expired token", error);
+          return res.status(400).json({ error: "Invalid or expired token" });
+        } else if (decoded.userId !== req.userId) {
+          console.error(
+            "Incorrect user attempting to verify code",
+            decoded.userId,
+            req.userId
+          );
+          return res.status(400).json({ error: "Invalid code" });
+        }
+        tokens.delete(code);
+        res.json({ token });
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("/verify-code error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
 
 export default router;

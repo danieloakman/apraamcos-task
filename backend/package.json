@@ -21,7 +21,8 @@
     "cors": "^2.8.5",
     "dotenv": "^17.1.0",
     "express": "^4.21.2",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "@apraamcos/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

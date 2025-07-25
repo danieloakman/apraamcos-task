@@ -2,7 +2,9 @@ import Database from "better-sqlite3";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-const db: Database.Database = new Database(join(__dirname, "..", "database", "database.db"));
+const db: Database.Database = new Database(
+  join(__dirname, "..", "database", "database.db")
+);
 
 export interface User {
   id: number;
@@ -60,23 +62,38 @@ export interface UserUpdateData {
 }
 
 export function initializeDatabase(): void {
-  const schema = readFileSync(join(__dirname, "..", "database", "schema.sql"), "utf8");
+  const schema = readFileSync(
+    join(__dirname, "..", "database", "schema.sql"),
+    "utf8"
+  );
   db.exec(schema);
-  
-  const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get() as { count: number };
+
+  const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get() as {
+    count: number;
+  };
   if (userCount.count === 0) {
-    const seedData = readFileSync(join(__dirname, "..", "database", "seed.sql"), "utf8");
+    const seedData = readFileSync(
+      join(__dirname, "..", "database", "seed.sql"),
+      "utf8"
+    );
     db.exec(seedData);
   }
 }
 
-export async function getUserById(id: number): Promise<SafeUser | null> {
+export async function getUserById(
+  id: number,
+  { select }: { select?: (keyof SafeUser)[] } = {}
+): Promise<SafeUser | null> {
   try {
-    const user = db.prepare(`SELECT * FROM users WHERE id = ${id}`).get() as User | null;
+    const user = db
+      .prepare(
+        `SELECT ${select ? select.join(", ") : "*"} FROM users WHERE id = ${id}`
+      )
+      .get() as User | null;
     if (!user) {
       return null;
     }
-    
+
     // Remove password from response
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...safeUser } = user;
@@ -89,32 +106,38 @@ export async function getUserById(id: number): Promise<SafeUser | null> {
 
 export async function getUserByEmail(email: string): Promise<User | null> {
   try {
-    return db.prepare(`SELECT * FROM users WHERE email = '${email}'`).get() as User | null;
+    return db
+      .prepare(`SELECT * FROM users WHERE email = '${email}'`)
+      .get() as User | null;
   } catch (error) {
     console.error("Error getting user by email:", error);
     throw error;
   }
 }
 
-export async function updateUser(id: number, data: UserUpdateData): Promise<SafeUser | null> {
+export async function updateUser(
+  id: number,
+  data: UserUpdateData
+): Promise<SafeUser | null> {
   try {
-    const fields = Object.keys(data)
-      .filter(key => data[key as keyof UserUpdateData] !== undefined)
-    
+    const fields = Object.keys(data).filter(
+      key => data[key as keyof UserUpdateData] !== undefined
+    );
+
     if (fields.length === 0) {
       return await getUserById(id);
     }
-    
+
     const setClause = fields.map(field => `${field} = ?`).join(", ");
     const values = fields.map(field => data[field as keyof UserUpdateData]);
-    
+
     const stmt = db.prepare(`UPDATE users SET ${setClause} WHERE id = ?`);
     const result = stmt.run(...values, id);
-    
+
     if (result.changes === 0) {
       return null;
     }
-    
+
     return await getUserById(id);
   } catch (error) {
     console.error("Error updating user:", error);
