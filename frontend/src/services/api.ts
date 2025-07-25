@@ -1,8 +1,34 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  Query,
+  QueryKey,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { create } from "zustand";
 
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "http://localhost:3001/api";
 
+export const NAMED_QUERY_KEYS = [
+  "login",
+  "logout",
+  "request-sensitive-code",
+  "verify-sensitive-code",
+  "current-user",
+  "update-current-user",
+] as const;
+export type NamedQueryKey = (typeof NAMED_QUERY_KEYS)[number];
+const createQueryKey = (key: NamedQueryKey, ...extra: unknown[]): QueryKey => [
+  key,
+  ...extra,
+];
+const includesQueryKeys =
+  (...keys: NamedQueryKey[]) =>
+  (q: Query) =>
+    keys.some(k => q.queryKey.includes(k));
+
+/** Purposely not stored in local storage. */
 let sensitiveAuthToken: string | null = null;
 function getAuthToken(): string | null {
   if (sensitiveAuthToken) return sensitiveAuthToken;
@@ -22,55 +48,113 @@ function getAuthHeaders() {
   return headers;
 }
 
-export const apiService = {
-  async login(email: string, password: string) {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Invalid email or password");
+async function fetchWithAuth(
+  url: string,
+  { headers, ...options }: RequestInit = {}
+) {
+  const response = await fetch(url, {
+    ...options,
+    headers: { ...getAuthHeaders(), ...headers },
+  });
+  debugger;
+  if (response.status === 401) {
+    if (sensitiveAuthToken) {
+      // Try again without the sensitive auth token:
+      sensitiveAuthToken = null;
+      return fetchWithAuth(url, options);
+    } else {
+      localStorage.removeItem("auth_token");
+      sensitiveAuthToken = null;
     }
+  }
+  return response;
+}
 
-    const data = await response.json();
-    localStorage.setItem("auth_token", data.token);
-    return data;
-  },
+export const isAuthenticated = () => getAuthToken() !== null;
 
-  async getCurrentUser() {
-    const response = await fetch(`${API_BASE_URL}/users/me`, {
-      headers: getAuthHeaders(),
-    });
-    if (!response.ok) {
-      throw new Error("Failed to fetch user");
-    }
-    return response.json();
-  },
+export function useLogin() {
+  const queryClient = useQueryClient();
 
-  async updateCurrentUser(data: any) {
-    const response = await fetch(`${API_BASE_URL}/users/me`, {
-      method: "PUT",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      throw new Error("Failed to update user");
-    }
-    return response.json();
-  },
+  return useMutation({
+    mutationKey: createQueryKey("login"),
+    mutationFn: async (params: { email: string; password: string }) => {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(params),
+      });
 
-  logout(): void {
-    localStorage.removeItem("auth_token");
-  },
+      if (!response.ok) {
+        throw new Error("Invalid email or password");
+      }
 
-  isAuthenticated(): boolean {
-    return getAuthToken() !== null;
-  },
-};
+      const data = await response.json();
+      localStorage.setItem("auth_token", data.token);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        predicate: includesQueryKeys("current-user"),
+      });
+    },
+  });
+}
+
+export function useLogout() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationKey: createQueryKey("logout"),
+    mutationFn: async () => {
+      localStorage.removeItem("auth_token");
+      sensitiveAuthToken = null;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        predicate: includesQueryKeys("current-user"),
+      });
+    },
+  });
+}
+
+export function useCurrentUser() {
+  return useQuery({
+    queryKey: createQueryKey("current-user"),
+    queryFn: async () => {
+      const response = await fetchWithAuth(`${API_BASE_URL}/users/me`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch user");
+      }
+      return response.json();
+    },
+    enabled: isAuthenticated(),
+  });
+}
+
+export function useUpdateCurrentUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationKey: createQueryKey("update-current-user"),
+    mutationFn: async (data: any) => {
+      const response = await fetchWithAuth(`${API_BASE_URL}/users/me`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to update user");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        predicate: includesQueryKeys("current-user"),
+      });
+    },
+  });
+}
 
 export const useRequestSensitiveCode = () => {
   return useMutation({
@@ -91,6 +175,7 @@ export const useRequestSensitiveCode = () => {
 };
 
 export const useVerifySensitiveCode = (code?: string) => {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: ["verify-code", code],
     queryFn: async () => {
@@ -104,6 +189,9 @@ export const useVerifySensitiveCode = (code?: string) => {
       }
       const data = await response.json();
       sensitiveAuthToken = data.token;
+      queryClient.invalidateQueries({
+        predicate: includesQueryKeys("current-user"),
+      });
       return data;
     },
     enabled: !!code && code.length === 6,

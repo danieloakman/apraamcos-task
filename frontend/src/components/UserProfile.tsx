@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { apiService } from "../services/api";
+import { useCurrentUser, useUpdateCurrentUser } from "../services/api";
 import AddressSection from "./AddressSection";
 import ContactSection from "./ContactSection";
 import BankingSection from "./BankingSection";
 import SocialLinksSection from "./SocialLinksSection";
 
 const UserProfile: React.FC = () => {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: user,
+    isLoading: loadingUser,
+    error: userError,
+  } = useCurrentUser();
+  const updateCurrentUser = useUpdateCurrentUser();
   const [success, setSuccess] = useState<string | null>(null);
   const [isEditingPersonal, setIsEditingPersonal] = useState(false);
   const [personalName, setPersonalName] = useState("");
@@ -18,39 +21,26 @@ const UserProfile: React.FC = () => {
   const [savingPersonal, setSavingPersonal] = useState(false);
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const userData = await apiService.getCurrentUser();
-        setUser(userData);
-        setPersonalName(userData.name || "");
-        
-        // Parse date_of_birth into separate components
-        if (userData.date_of_birth) {
-          const [year, month, day] = userData.date_of_birth.split("-");
-          setPersonalYear(year || "");
-          setPersonalMonth(month || "");
-          setPersonalDay(day || "");
-        } else {
-          setPersonalYear("");
-          setPersonalMonth("");
-          setPersonalDay("");
-        }
-        
-        setError(null);
-      } catch {
-        setError("Failed to load user data");
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (!user) return;
+    setPersonalName(user.name || "");
 
-    fetchUser();
-  }, []);
+    // Parse date_of_birth into separate components
+    if (user.date_of_birth) {
+      const [year, month, day] = user.date_of_birth.split("-");
+      setPersonalYear(year || "");
+      setPersonalMonth(month || "");
+      setPersonalDay(day || "");
+    } else {
+      setPersonalYear("");
+      setPersonalMonth("");
+      setPersonalDay("");
+    }
+  }, [user]);
 
   const handleSectionSave = async (sectionData: any) => {
-    if (!user) {
-      return
-    };
+    if (!user.data) {
+      return;
+    }
 
     try {
       const updateData = {
@@ -70,15 +60,15 @@ const UserProfile: React.FC = () => {
         ...sectionData,
       };
 
-      const updatedUser = await apiService.updateCurrentUser(updateData);
-      setUser(updatedUser);
+      const updatedUser = await updateCurrentUser.mutateAsync(updateData);
+      // setUser(updatedUser);
       setSuccess("Section updated successfully!");
-      setError(null);
-      
+      // setError(null);
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
     } catch {
-      setError("Failed to update section");
+      // setError("Failed to update section");
     }
   };
 
@@ -90,7 +80,7 @@ const UserProfile: React.FC = () => {
       if (personalYear && personalMonth && personalDay) {
         dateOfBirth = `${personalYear}-${personalMonth.padStart(2, "0")}-${personalDay.padStart(2, "0")}`;
       }
-      
+
       await handleSectionSave({
         name: personalName,
         date_of_birth: dateOfBirth,
@@ -105,7 +95,7 @@ const UserProfile: React.FC = () => {
 
   const handlePersonalCancel = () => {
     setPersonalName(user?.name || "");
-    
+
     // Reset date components
     if (user?.date_of_birth) {
       const [year, month, day] = user.date_of_birth.split("-");
@@ -117,7 +107,7 @@ const UserProfile: React.FC = () => {
       setPersonalMonth("");
       setPersonalDay("");
     }
-    
+
     setIsEditingPersonal(false);
   };
 
@@ -156,8 +146,7 @@ const UserProfile: React.FC = () => {
     return days;
   };
 
-
-  if (loading) {
+  if (loadingUser) {
     return <div className="loading">Loading user profile...</div>;
   }
 
@@ -167,7 +156,7 @@ const UserProfile: React.FC = () => {
 
   return (
     <div className="user-profile">
-      {error && <div className="error">{error}</div>}
+      {userError && <div className="error">{userError.message}</div>}
       {success && <div className="success">{success}</div>}
 
       <div className="section">
@@ -261,7 +250,9 @@ const UserProfile: React.FC = () => {
             </div>
             <div className="form-group">
               <label>Date of Birth:</label>
-              <div className="field-value">{user.date_of_birth || "Not provided"}</div>
+              <div className="field-value">
+                {user.date_of_birth || "Not provided"}
+              </div>
             </div>
           </>
         )}

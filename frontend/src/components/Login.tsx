@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { apiService } from "../services/api";
+import { useLogin } from "../services/api";
 
 interface LoginProps {
   onLogin: () => void;
@@ -8,22 +8,15 @@ interface LoginProps {
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  // const [error, setError] = useState<string | null>(null);
+  // const [loading, setLoading] = useState(false);
+  const { mutateAsync: login, isPending: loading, error } = useLogin();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
 
-    try {
-      await apiService.login(email, password);
-      onLogin();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
-    } finally {
-      setLoading(false);
-    }
+    await login({ email, password });
+    onLogin();
   };
 
   return (
@@ -31,7 +24,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       <div className="login-form">
         <h2>Login to Your Account</h2>
 
-        {error && <div className="error">{error}</div>}
+        {error && (
+          <div className="error">
+            {error instanceof Error ? error.message : "Login failed"}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
