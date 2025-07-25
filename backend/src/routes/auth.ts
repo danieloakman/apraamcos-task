@@ -1,7 +1,12 @@
 import express, { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { getUserByEmail } from "../database";
-import { generateToken } from "../middleware/auth";
+import {
+  authenticateToken,
+  AuthRequest,
+  generateToken,
+  verifyToken,
+} from "../middleware/auth";
 
 const router = express.Router();
 
@@ -50,5 +55,65 @@ router.post("/login", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+/** Since there's only a 15min expiry on the sensitive auth token, we can just store the code in memory */
+const tokens = new Map<number, string>();
+
+router.post(
+  "/sensitive/request-code",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
+      if (req.authLevel === "sensitive")
+        res.status(400).json({ error: "Already authenticated" });
+      else {
+        const token = generateToken(userId, { authLevel: "sensitive" });
+        const code = Math.floor(100000 + Math.random() * 900000);
+        tokens.set(code, token);
+        console.log(`${new Date().toISOString()}: ${code}`);
+        res.status(204).send();
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("/request-code error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+router.post(
+  "/sensitive/verify-code",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (req.authLevel === "sensitive")
+        res.status(400).json({ error: "Already authenticated" });
+      else {
+        const { code } = req.body;
+        const token = tokens.get(code);
+        if (!token) return res.status(400).json({ error: "Invalid code" });
+        const { value: decoded, error } = verifyToken(token);
+        if (error) {
+          console.error("Invalid or expired token", error);
+          return res.status(400).json({ error: "Invalid or expired token" });
+        } else if (decoded.userId !== req.userId) {
+          console.error(
+            "Incorrect user attempting to verify code",
+            decoded.userId,
+            req.userId
+          );
+          return res.status(400).json({ error: "Invalid code" });
+        }
+        tokens.delete(code);
+        res.json({ token });
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("/verify-code error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
 
 export default router;
